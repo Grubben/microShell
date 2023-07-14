@@ -5,7 +5,8 @@ CFLAGS		= -g3 -Wall -Wextra #-Werror
 
 RM			= rm -rf
 
-SRCS		= $(wildcard *.c)
+# SRCS		= $(wildcard *.c)
+SRCS		= mine.c
 
 OBJS		= $(SRCS:.c=.o)
 
