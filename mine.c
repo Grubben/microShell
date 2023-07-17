@@ -1,96 +1,63 @@
 #include <unistd.h>
-#include <sys/wait.h>
 #include <string.h>
+#include <sys/wait.h>
 
-#include <stdio.h>
-
-#define WRITE 1
-#define READ  0
-
-int	putstr_err(char *str, char *arg)
+void	puterr(char *string, char *opt)
 {
-	while (*str)
-		write(2, str++, 1);
-	if (arg)
-		while(*arg)
-			write(2, arg++, 1);
+	while (*string)
+		write(2, string++, 1);
+	if (opt)
+	{
+		while (*opt)
+			write(2, opt++, 1);
+	}
 	write(2, "\n", 1);
-	return (1);
 }
 
-int ft_execute(char *argv[], int i, int tmp_fd, char *env[])
+int	main(int argc, char *argv[], char *envp[])
 {
-	//overwrite ; or | or NULL with NULL to use the array as input for execve.
-	//we are here in the child so it has no impact in the parent process.
-    putstr_err("argv[i]", argv[i]);
-	// argv[i] = NULL;
-	dup2(tmp_fd, STDIN_FILENO);
-	close(tmp_fd);
-	execve(argv[0], argv, env);
-	return (putstr_err("error: cannot execute ", argv[0]));
-}
-
-int	main(int argc, char *argv[], char *env[])
-{
+	int	fd[2];
 	int	i;
-	int fd[2];
-	int tmp_fd;
-	(void)argc;	// is needed in exam, because the exam tester compiles with -Wall -Wextra -Werror
+	int	tmpfd;
 
 	i = 0;
- 	tmp_fd = dup(STDIN_FILENO);
-	while (argv[i] && argv[i + 1]) //check if the end is reached
+	tmpfd = dup(STDIN_FILENO);
+	while (argv[i])
 	{
-		argv = &argv[i + 1];	//the new argv start after the ; or |
+		argv = &argv[i + 1];
+		puterr(argv[0], NULL);
+		
 		i = 0;
-		//count until we have all informations to execute the next child;
 		while (argv[i] && strcmp(argv[i], ";") && strcmp(argv[i], "|"))
 			i++;
-		if (strcmp(argv[0], "cd") == 0) //cd
+		
+		// if (i == 0)
+		// 	puterr("error: fatal");
+		// puterr(argv[0], NULL);
+		if (strcmp(argv[0], "cd") == 0)
 		{
-			if (i != 2)
-				putstr_err("error: cd: bad arguments", NULL);
-			else if (chdir(argv[1]) != 0)
-				putstr_err("error: cd: cannot change directory to ", argv[1]);
-		}
-		else if (argv[i] == NULL || strcmp(argv[i], ";") == 0) //exec in stdout
-		{
-			if ( fork() == 0)
+			if (i > 2)
+				puterr("error: cd: bad arguments", NULL);
+			else
 			{
-				if (ft_execute(argv, i, tmp_fd, env))
-					return (1);
+				if (chdir(argv[1]) != 0 )
+					puterr("error: cd: cannot change directory to ", argv[1]);
+			}
+		}
+		else if (argv[i] == NULL || strcmp(argv[i], ";"))
+		{
+			if (fork() == 0)
+			{
+				argv[i] = NULL;
+				close(tmpfd);
+				if (execve(argv[0], argv, envp) == -1)
+					puterr("error: cannot execute ", argv[0]);
 			}
 			else
 			{
-				close(tmp_fd);
-				while(waitpid(-1, NULL, WUNTRACED) != -1)
-					;
-				tmp_fd = dup(STDIN_FILENO);
+				waitpid(-1, NULL, WUNTRACED);
 			}
 		}
-		else if( strcmp(argv[i], "|") == 0 ) //pipe
-		{
-			pipe(fd);
-			if ( fork() == 0)
-			{
-                // child process
-				dup2(fd[WRITE], STDOUT_FILENO);
-				close(fd[READ]);
-				close(fd[WRITE]);
-				if (ft_execute(argv, i, tmp_fd, env))
-					return (1);
-			}
-			else
-			{
-                // parent process
-				close(fd[WRITE]);
-				close(tmp_fd);
-				tmp_fd = fd[READ];
-			}
-		}
+		//TODO: pipe: "|"
 	}
-	close(tmp_fd);
-	// if (TEST)		// not needed in exam, but necessary if you want to use this tester:
-	// 	while (1);	// https://github.com/Glagan/42-exam-rank-04/blob/master/microshell/test.sh
-	return (0);
 }
